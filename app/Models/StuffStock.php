@@ -9,6 +9,7 @@ class StuffStock extends Model
 {
     use SoftDeletes;
     protected $fillable = ['stuff_id', 'total_available', 'total_defec'];
+    // public $table = 'stuff__stocks';
 
     public function stuff()
     {
