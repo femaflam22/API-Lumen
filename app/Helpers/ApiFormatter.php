@@ -19,4 +19,10 @@ class ApiFormatter {
         self::$response['data'] = $data;
         return response()->json(self::$response, self::$response['status']);
     }
+
+    public static function send()
+    {
+        return null;
+    }
+
 }
