@@ -22,7 +22,7 @@ class ApiFormatter {
 
     public static function send()
     {
-        return 0;
+        return "x";
     }
 
 }
