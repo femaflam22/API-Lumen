@@ -12,14 +12,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('restorations', function (Blueprint $table) {
-            $table->id();
-            $table->bigInteger("user_id");
-            $table->bigInteger("lending_id");
-            $table->datetime("date_time");
-            $table->integer("total_good_stuff");
-            $table->integer("total_defec_stuff");
-            $table->timestamps();
+            $table->uuid('id')->primary();
+            $table->uuid('user_id');
+            $table->uuid('lending_id');
+            $table->dateTime('date_time');
+            $table->integer('total_good_stuff');
+            $table->integer('total_defec_stuff');
             $table->softDeletes();
+            $table->timestamps();
         });
     }
 

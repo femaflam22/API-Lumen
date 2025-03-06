@@ -12,14 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
-            // $table->bigInteger("no")->primary();
-            $table->id();
-            $table->string("username")->unique();
-            $table->string("email")->unique();
-            $table->string("password");
-            $table->enum("role", ['staff', 'admin']);
+            $table->uuid('id')->primary();
+            $table->string('username')->unique();
+            $table->string('email')->unique();
+            $table->string('password');
+            $table->enum('role', ['admin', 'staff']);
+            $table->softDeletes(); //ketika menghapus, data tdk hilang di db (seperti sistem recycle bin)
             $table->timestamps();
-            $table->softDeletes();
         });
     }
 

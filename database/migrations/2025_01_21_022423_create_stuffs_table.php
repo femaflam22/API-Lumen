@@ -11,13 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('stuff_stocks', function (Blueprint $table) {
-            $table->id();
-            $table->bigInteger("stuff_id");
-            $table->integer("total_available");
-            $table->integer("total_defec");
-            $table->timestamps();
+        Schema::create('stuffs', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->string('name');
+            $table->enum('type', ['HTL/KLN', 'Lab', 'Sarpras']);
             $table->softDeletes();
+            $table->timestamps();
         });
     }
 
@@ -26,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('stuff_stocks');
+        Schema::dropIfExists('stuffs');
     }
 };

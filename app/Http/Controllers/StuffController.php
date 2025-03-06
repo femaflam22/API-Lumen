@@ -2,140 +2,157 @@
 
 namespace App\Http\Controllers;
 
-use App\Helpers\ApiFormatter;
-use App\Models\Stuff;
+use App\Http\Requests\StuffRequest;
+use App\Http\Resources\StuffResource;
+use App\Services\StuffService;
 use Illuminate\Http\Request;
 
 class StuffController extends Controller
 {
-    public function __construct()
+    private $stuffService;
+    public function __construct(StuffService $stuffService)
     {
-        $this->middleware('auth:api');
+        $this->stuffService = $stuffService;
     }
 
     public function index()
     {
         try {
-            $data = Stuff::with('stuffStock')->get();
-
-            return ApiFormatter::sendResponse(200, 'success', $data);
+            $stuffs = $this->stuffService->index();
+            // response()->json : hasil yg akan dimunculkan ketika mengakses url terkait : json(dataygmaudimunculin, httpstatuscode)
+            return response()->json([
+                "status" => 200,
+                "message" => "Berhasil menampilkan seluruh data barang!",
+                "data" => StuffResource::collection($stuffs)
+            ], 200);
         } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
+            // jika try ada yg error, munculkan response berupa desk err dan statusnya 400
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
         }
     }
 
-    public function store(Request $request)
+    public function store (Request $request)
     {
         try {
-            $this->validate($request, [
-                'name' => 'required|min:3',
-                'category' => 'required',
-            ]);
-
-            $prosesData = Stuff::create([
-                'name' => $request->name,
-                'category' => $request->category,
-            ]);
-
-            if ($prosesData) {
-                return ApiFormatter::sendResponse(200, 'success', $prosesData);
-            } else {
-                return ApiFormatter::sendResponse(400, 'bad request', 'Gagal memproses tambah data stuff! silahkan coba lagi.');
-            }
+            $payload = StuffRequest::validate($request);
+            $stuff = $this->stuffService->store($payload);
+            // jika mengambil data gunakan ::collection, jika menambah/mengubah data gunakan new
+            return response()->json([
+                "status" => 200,
+                "message" => "Berhasil menambahkan data barang baru!",
+                "data" => new StuffResource($stuff)
+            ], 200);
         } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
+        }
+    }
+
+    public function update (Request $request, $id)
+    {
+        try {
+            $payload = StuffRequest::validate($request);
+            $stuff = $this->stuffService->update($payload, $id);
+            return response()->json([
+                "status" => 200,
+                "message" => "Berhasil mengubah data barang!",
+                "data" => new StuffResource($stuff)
+            ], 200);
+        } catch (\Exception $err) {
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
         }
     }
 
     public function show($id)
     {
         try {
-            $data = Stuff::where('id', $id)->first();
-
-            return ApiFormatter::sendResponse(200, 'success', $data);
+            $stuffs = $this->stuffService->show($id);
+            return response()->json([
+                "status" => 200,
+                "message" => "Berhasil menampilkan data detail barang!",
+                "data" => new StuffResource($stuffs)
+            ], 200);
         } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
-        }
-    }
-
-    public function update(Request $request, $id)
-    {
-        try {
-            $this->validate($request, [
-                'name' => 'required',
-                'category' => 'required',
-            ]);
-
-            $checkProsess = Stuff::where('id', $id)->update([
-                'name' => $request->name,
-                'category' => $request->category,
-            ]);
-
-            if ($checkProsess) {
-                $data = Stuff::where('id', $id)->first();
-                return ApiFormatter::sendResponse(200, 'success', $data);
-            }
-        } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
         }
     }
 
     public function destroy($id)
     {
         try {
-            $stuff = Stuff::where('id', $id)->with('inboundStuffs')->first();
-
-            if (count($stuff['inboundStuffs']) > 0) {
-                return ApiFormatter::sendResponse(400, 'bad request', 'Tidak dapat menghapus data stuff yang memiliki relasi dengan data inbound stuff!');
-            }
-            $checkProsess = $stuff->delete();
-
-            if ($checkProsess) {
-                return ApiFormatter::sendResponse(200, 'success', 'Berhasil hapus data stuff!');
-            }
+            $stuffs = $this->stuffService->destroy($id);
+            return response()->json([
+                "status" => 200,
+                "message" => "Berhasil menghapus barang!",
+                "data" => []
+            ], 200);
         } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
         }
     }
 
     public function trash()
     {
         try {
-            // onlyTrashed() : memanggil data sampah/yg sudah dihapus/deleted_at nya terisi
-            $data = Stuff::onlyTrashed()->get();
-
-            return ApiFormatter::sendResponse(200, 'success', $data);
+            $stuffs = $this->stuffService->trash();
+            return response()->json([
+                "status" => 200,
+                "message" => "Berhasil mengambil data sampah!",
+                "data" => StuffResource::collection($stuffs)
+            ], 200);
         } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
         }
     }
 
     public function restore($id)
     {
         try {
-            // restore : mengambalikan data spesifik yg dihapus/menghapus deleted_at nya
-            $checkRestore = Stuff::onlyTrashed()->where('id', $id)->restore();
-
-            if ($checkRestore) {
-                $data = Stuff::where('id', $id)->first();
-                return ApiFormatter::sendResponse(200, 'success', $data);
-            }
+            $stuff = $this->stuffService->restore($id);
+            return response()->json([
+                "status" => 200,
+                "message" => "Berhasil mengambalikan data terhapus!",
+                "data" => new StuffResource($stuff)
+            ], 200);
         } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
         }
     }
 
     public function permanentDelete($id)
     {
         try {
-            // forceDelete() : menghapus permanent (hilang jg data di db nya)
-            $checkPermanentDelete = Stuff::onlyTrashed()->where('id', $id)->forceDelete();
-
-            if ($checkPermanentDelete) {
-                return ApiFormatter::sendResponse(200, 'success', 'Berhasil menghapus permanent data stuff!');
-            }
+            $delete = $this->stuffService->permanentDelete($id);
+            return response()->json([
+                "status" => 200,
+                "message" => "Berhasil menghapus barang secara permanen!",
+                "data" => []
+            ], 200);
         } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
         }
     }
 }

@@ -12,15 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('lendings', function (Blueprint $table) {
-            $table->id();
-            $table->bigInteger("stuff_id");
-            $table->datetime("date_time");
-            $table->string("name");
-            $table->bigInteger("user_id");
-            $table->text("notes");
-            $table->integer("total_stuff");
-            $table->timestamps();
+            $table->uuid('id')->primary();
+            $table->uuid('user_id');
+            $table->uuid('stuff_id');
+            $table->dateTime('date_time');
+            $table->string('name');
+            $table->text('notes')->nullable(); //boleh kosong
+            $table->integer('total_stuff');
             $table->softDeletes();
+            $table->timestamps();
         });
     }
 

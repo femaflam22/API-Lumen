@@ -2,144 +2,143 @@
 
 namespace App\Http\Controllers;
 
-use App\Helpers\ApiFormatter;
+use App\Http\Requests\UserLoginRequest;
+use App\Http\Requests\UserRequest;
+use App\Http\Resources\UserResource;
+use App\Services\UserService;
 use Illuminate\Http\Request;
-use App\Models\User;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
-    public function __construct()
+    private $userService;
+    public function __construct(UserService $userService)
     {
-        $this->middleware('auth:api');
+        $this->userService = $userService;
     }
-    
+
+    public function register(Request $request)
+    {
+        try {
+            $payload = UserRequest::validate($request);
+            $user = $this->userService->store($payload);
+            // jika mengambil data gunakan ::collection, jika menambah/mengubah data gunakan new
+            return response()->json([
+                "status" => 200,
+                "message" => "Berhasil membuat akun!",
+                "data" => new UserResource($user)
+            ], 200);
+        } catch (\Exception $err) {
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
+        }
+    }
+
+    public function login(Request $request)
+    {
+        try {
+            $payload = UserLoginRequest::validate($request);
+            $userStatus = $this->userService->checkStatus($payload);
+            if ($userStatus) {
+                $token = Auth::attempt($payload);
+                if (!$token) {
+                    return response()->json([
+                        "status" => 400,
+                        "message" => 'User not found',
+                        "data" => []
+                    ], 400);
+                }
+                $respondWithToken = [
+                    'access_token' => $token,
+                    'token_type' => 'bearer',
+                    'user' => auth()->user(),
+                ];
+                return response()->json([
+                    "status" => 200,
+                    "message" => "Berhasil login!",
+                    "data" => $respondWithToken
+                ], 200);
+            } else {
+                return response()->json([
+                    "status" => 400,
+                    "message" => "Tidak dapat melakukan proses login. User tidak aktif!"
+                ], 400);
+            }
+        } catch (\Exception $err) {
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
+        }
+    }
+
+    public function me()
+    {
+        try {
+            $user = Auth::user();
+            return response()->json([
+                "status" => 200,
+                "message" => "Berhasil mengambil data identitas login!",
+                "data" => $user
+            ], 200);
+        } catch (\Exception $err) {
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
+        }
+    }
+
+    public function logout()
+    {
+        try {
+            Auth::logout();
+            return response()->json([
+                "status" => 200,
+                "message" => 'berhasil logout!',
+                "data" => []
+            ], 200);
+        } catch (\Exception $err) {
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
+        }
+    }
+
+    public function nonAktif($userId)
+    {
+        try {
+            $updatedData = $this->userService->nonAktif($userId);
+            return response()->json([
+                "status" => 200,
+                "message" => "Berhasil menonaktifkan akun!",
+                "data" => new UserResource($updatedData)
+            ], 200);
+        } catch (\Exception $err) {
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
+        }
+    }
+
     public function index()
     {
         try {
-            $data = User::all()->toArray();
-
-            return ApiFormatter::sendResponse(200, 'success', $data);
+            $updatedData = $this->userService->index();
+            return response()->json([
+                "status" => 200,
+                "message" => "Berhasil menampilkan seluruh data user!",
+                "data" => UserResource::collection($updatedData)
+            ], 200);
         } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
-        }
-    }
-
-    public function store(Request $request)
-    {
-        try {
-            $this->validate($request, [
-                'username' => 'required|unique:users,username',
-                'email' => 'required|unique:users,email',
-                'password' => 'required',
-                'role' => 'required'
-            ]);
-
-            $prosesData = User::create([
-                'username' => $request->username,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-                'role' => $request->role,
-            ]);
-
-            if ($prosesData) {
-                return ApiFormatter::sendResponse(200, 'success', $prosesData);
-            } else {
-                return ApiFormatter::sendResponse(400, 'bad request', 'Gagal memproses tambah data stuff! silahkan coba lagi.');
-            }
-        } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
-        }
-    }
-
-    public function show($id)
-    {
-        try {
-            $data = User::where('id', $id)->first();
-
-            return ApiFormatter::sendResponse(200, 'success', $data);
-        } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
-        }
-    }
-
-    public function update(Request $request, $id)
-    {
-        try {
-            $this->validate($request, [
-                'username' => 'required|unique:users,username,' . $id,
-                'email' => 'required|unique:users,email,' . $id,
-                'password' => 'required',
-                'role' => 'required'
-            ]);
-
-            $checkProsess = User::where('id', $id)->update([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-                'role' => $request->role,
-            ]);
-
-            if ($checkProsess) {
-                $data = User::where('id', $id)->first();
-                return ApiFormatter::sendResponse(200, 'success', $data);
-            }
-        } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
-        }
-    }
-
-    public function destroy($id)
-    {
-        try {
-            $checkProsess = User::where('id', $id)->delete();
-
-            if ($checkProsess) {
-                return ApiFormatter::sendResponse(200, 'success', 'Berhasil hapus data stuff!');
-            }
-        } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
-        }
-    }
-
-    public function trash()
-    {
-        try {
-            // onlyTrashed() : memanggil data sampah/yg sudah dihapus/deleted_at nya terisi
-            $data = User::onlyTrashed()->get();
-
-            return ApiFormatter::sendResponse(200, 'success', $data);
-        } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
-        }
-    }
-
-    public function restore($id)
-    {
-        try {
-            // restore : mengambalikan data spesifik yg dihapus/menghapus deleted_at nya
-            $checkRestore = User::onlyTrashed()->where('id', $id)->restore();
-
-            if ($checkRestore) {
-                $data = User::where('id', $id)->first();
-                return ApiFormatter::sendResponse(200, 'success', $data);
-            }
-        } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
-        }
-    }
-
-    public function permanentDelete($id)
-    {
-        try {
-            // forceDelete() : menghapus permanent (hilang jg data di db nya)
-            $checkPermanentDelete = User::onlyTrashed()->where('id', $id)->forceDelete();
-
-            if ($checkPermanentDelete) {
-                return ApiFormatter::sendResponse(200, 'success', 'Berhasil menghapus permanent data stuff!');
-            }
-        } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
         }
     }
 }

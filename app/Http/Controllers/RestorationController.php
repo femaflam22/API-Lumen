@@ -2,59 +2,57 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\RestorationRequest;
+use App\Http\Resources\RestorationResource;
+use App\Services\RestorationService;
+use App\Services\StuffStockService;
 use Illuminate\Http\Request;
-use App\Models\Lending;
-use App\Models\Restoration;
-use App\Models\StuffStock;
-use App\Helpers\ApiFormatter;
 
 class RestorationController extends Controller
 {
-    public function __construct()
+    private $restorationService, $stuffStockService;
+    public function __construct(RestorationService $restorationService, StuffStockService $stuffStockService)
     {
-        $this->middleware('auth:api');
+        $this->restorationService = $restorationService;
+        $this->stuffStockService = $stuffStockService;
     }
 
-    public function store (Request $request, $lending_id)
+    public function index()
     {
         try {
-            $this->validate($request, [
-                'date_time' => 'required',
-                'total_good_stuff' => 'required',
-                'total_defec_stuff' => 'required',
-            ]);
-            $lending = Lending::where('id', $lending_id)->first();
-            //mendata jumlah masukan barang kembali yang bagus & rusak
-            $totalStuffRestoration = (int)$request->total_good_stuff + (int)$request->total_defec_stuff;
-            //mengecek apakah jmlh barang dikembalikan > jmlh ketika meminjam
-            if ((int)$totalStuffRestoration > (int)$lending['total_stuff']) {
-                return ApiFormatter::sendResponse(400, 'bad request', 'Total barang kembali lebih banyak dari barang dipinjam!');
-            } else {
-                //updateOrCreate : klo uda ada data lending_id nya bakal diupdate datanya, klo belum dibikinin
-                $restoration = Restoration::updateOrCreate([
-                    'lending_id' => $lending_id
-                ], [
-                    'date_time' => $request->date_time,
-                    'total_good_stuff' => $request->total_good_stuff,
-                    'total_defec_stuff' => $request->total_defec_stuff,
-                    'user_id' => auth()->user()->id,
-                ]);
-                $stuffStock = StuffStock::where('stuff_id', $lending['stuff_id'])->first();
-                //menghitung data baru yg akan dimasukan ke stuffstock
-                //$totalAvailableStock penjumlahan sblmnya dan barang bagus yg kembali
-                $totalAvailableStock = (int)$stuffStock['total_available'] + (int)$request->total_good_stuff;
-                //$totalDefecStock penjumlahan data defec sblmnya dan defec yg kembali
-                $totalDefecStock = (int)$stuffStock['total_defec'] + (int)$request->total_defec_stuff;
-                $stuffStock->update([
-                    'total_available' => $totalAvailableStock,
-                    'total_defec' => $totalDefecStock,
-                ]);
-                // data yg akan dimunculkan, dari lending beserta relasi user, restoration, user milik restoration, barang, dan stock nya
-                $lendingRestoration = Lending::where('id', $lending_id)->with('user', 'restoration', 'restoration.user', 'stuff', 'stuff.stuffStock')->first();
-                return ApiFormatter::sendResponse(200, 'success', $lendingRestoration);
+            $restorations = $this->restorationService->index();
+            return response()->json([
+                "status" => 200,
+                "message" => "Berhasil menampilkan seluruh data pengembalian barang!",
+                "data" => RestorationResource::collection($restorations)
+            ], 200);
+        } catch (\Exception $err) {
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
+        }
+    }
+
+    public function store(Request $request)
+    {
+        try {
+            $payload = RestorationRequest::validate($request);
+            $checkStuff = $this->restorationService->checkTotalStuff($payload);
+            if (is_null($checkStuff)) {
+                $restoration = $this->restorationService->store($payload);
+                $stuffStock = $this->stuffStockService->upStock($payload);
+                return response()->json([
+                    "status" => 200,
+                    "message" => "Berhasil menambahkan data pengembalian barang!",
+                    "data" => new RestorationResource($restoration)
+                ], 200);
             }
         } catch (\Exception $err) {
-            return ApiFormatter::sendResponse(400, 'bad request', $err->getMessage());
+            return response()->json([
+                "status" => 400,
+                "message" => $err->getMessage()
+            ], 400);
         }
     }
 }

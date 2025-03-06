@@ -11,12 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('stuffs', function (Blueprint $table) {
-            $table->id();
-            $table->string("name");
-            $table->enum("category", ['HTL', 'KLN', 'Teknisi/Sarpras']);
-            $table->timestamps();
+        Schema::create('inbound_stuffs', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->uuid('stuff_id');
+            $table->integer('total');
+            $table->dateTime('date_time');
+            $table->string('proof_file');
             $table->softDeletes();
+            $table->timestamps();
         });
     }
 
@@ -25,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('stuffs');
+        Schema::dropIfExists('inbound_stuffs');
     }
 };
